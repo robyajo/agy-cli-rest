@@ -140,7 +140,7 @@ app.post('/v1/chat/completions', async (c) => {
     }
     return c.json(formatOpenAIResponse(reqId, model, result.response, result.usage));
 });
-const port = Number(process.env.PORT) || 3000;
+const port = Number(process.env.PORT) || 8060;
 const host = process.env.HOST || '0.0.0.0';
 serve({
     fetch: app.fetch,

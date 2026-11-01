@@ -48,7 +48,7 @@ pnpm start
 Copy `.env.example` to `.env`:
 
 ```env
-PORT=3000
+PORT=8060
 HOST=0.0.0.0
 AGY_PATH=/home/roby/.local/bin/agy
 
@@ -73,7 +73,7 @@ Works out-of-the-box with any OpenAI client library.
 
 #### Non-Streaming Example:
 ```bash
-curl -X POST http://localhost:3000/v1/chat/completions \
+curl -X POST http://localhost:8060/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gemini-3.8-flash-high",
@@ -85,7 +85,7 @@ curl -X POST http://localhost:3000/v1/chat/completions \
 
 #### Streaming Example (SSE):
 ```bash
-curl -N -X POST http://localhost:3000/v1/chat/completions \
+curl -N -X POST http://localhost:8060/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gemini-3.8-flash-high",
@@ -131,7 +131,7 @@ After=network.target
 Type=simple
 User=roby
 WorkingDirectory=/srv/www/agy-rest
-Environment=PORT=3000
+Environment=PORT=8060
 Environment=HOST=0.0.0.0
 Environment=PATH=/home/roby/.nvm/versions/node/v26.13.0/bin:/home/roby/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/home/roby/.nvm/versions/node/v26.13.0/bin/node /srv/www/agy-rest/dist/index.js
@@ -158,7 +158,7 @@ server {
     server_name roby-agy.mooo.com;
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:8060;
         proxy_http_version 1.1;
 
         proxy_set_header Upgrade $http_upgrade;
