@@ -1,3 +1,4 @@
+import { loadEnvFile } from 'node:process';
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
@@ -5,24 +6,38 @@ import { streamSSE } from 'hono/streaming';
 import { randomUUID } from 'node:crypto';
 import { executeAgy, executeAgyStream, SUPPORTED_MODELS } from './agy.js';
 import { formatOpenAIChunk, formatOpenAIResponse, messagesToPrompt } from './openai.js';
+// Auto-load .env file if present
+try {
+    loadEnvFile();
+}
+catch {
+    // .env file not found or already provided via environment
+}
 const app = new Hono();
 // Enable CORS for all routes
 app.use('*', cors());
-// Optional API Key Authentication
+// API Key Authentication Middleware
 app.use('*', async (c, next) => {
     const apiKey = process.env.API_KEY;
     if (!apiKey)
         return next();
+    if (c.req.path === '/' || c.req.path === '/health') {
+        return next();
+    }
     const authHeader = c.req.header('Authorization');
     const token = authHeader?.replace(/^Bearer\s+/i, '') ||
         c.req.header('x-api-key') ||
         c.req.header('api-key');
-    if (c.req.path === '/' || c.req.path === '/health') {
-        return next();
+    if (!token || token !== apiKey) {
+        return c.json({
+            error: {
+                message: 'Unauthorized: Invalid or missing API key',
+                type: 'invalid_request_error',
+                code: 'invalid_api_key',
+            },
+        }, 401);
     }
-    if (token !== apiKey) {
-        return c.json({ error: 'Unauthorized: Invalid API key' }, 401);
-    }
+    // Token cocok, lanjutkan request
     return next();
 });
 // Root: API Documentation & Status
