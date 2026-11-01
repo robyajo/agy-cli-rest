@@ -46,7 +46,7 @@ export async function executeAgy(req) {
             stderr += data.toString();
         });
         proc.on('close', (code) => {
-            if (code !== 0) {
+            if (code !== 0 && !stdout) {
                 resolve({
                     success: false,
                     response: '',
@@ -54,32 +54,35 @@ export async function executeAgy(req) {
                 });
                 return;
             }
-            try {
-                const jsonMatch = stdout.match(/\{[\s\S]*\}$/);
-                if (jsonMatch) {
-                    const parsed = JSON.parse(jsonMatch[0]);
-                    resolve({
-                        success: parsed.status === 'SUCCESS' || true,
-                        conversation_id: parsed.conversation_id,
-                        response: parsed.response || '',
-                        duration_seconds: parsed.duration_seconds,
-                        num_turns: parsed.num_turns,
-                        usage: parsed.usage,
-                    });
-                    return;
+            // Find the JSON object line in stdout
+            const lines = stdout.split('\n');
+            for (let i = lines.length - 1; i >= 0; i--) {
+                const line = lines[i].trim();
+                if (line.startsWith('{') && line.endsWith('}')) {
+                    try {
+                        const parsed = JSON.parse(line);
+                        if (parsed.response !== undefined || parsed.conversation_id !== undefined) {
+                            resolve({
+                                success: parsed.status === 'SUCCESS' || true,
+                                conversation_id: parsed.conversation_id,
+                                response: parsed.response || '',
+                                duration_seconds: parsed.duration_seconds,
+                                num_turns: parsed.num_turns,
+                                usage: parsed.usage,
+                            });
+                            return;
+                        }
+                    }
+                    catch {
+                        // continue checking other lines
+                    }
                 }
-                resolve({
-                    success: true,
-                    response: stdout.trim(),
-                });
             }
-            catch (err) {
-                resolve({
-                    success: true,
-                    response: stdout.trim(),
-                    error: `Failed to parse json output: ${err.message}`,
-                });
-            }
+            resolve({
+                success: code === 0,
+                response: stdout.trim(),
+                error: code !== 0 ? stderr.trim() : undefined,
+            });
         });
         proc.on('error', (err) => {
             resolve({
@@ -93,61 +96,66 @@ export async function executeAgy(req) {
 export async function executeAgyStream(req, onDelta, onComplete, onError) {
     const agyBinary = getAgyBinary();
     const args = buildArgs(req, 'stream-json');
-    const proc = spawn(agyBinary, args, {
-        cwd: req.cwd || process.cwd(),
-        env: { ...process.env },
-    });
-    let buffer = '';
-    let fullResponse = '';
-    let finalResult = {
-        success: true,
-        response: '',
-    };
-    proc.stdout.on('data', (chunk) => {
-        buffer += chunk.toString();
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed)
-                continue;
-            try {
-                const parsed = JSON.parse(trimmed);
-                if (parsed.event === 'step_update' && parsed.step_update?.text_delta) {
-                    const delta = parsed.step_update.text_delta;
-                    fullResponse += delta;
-                    onDelta(delta);
+    return new Promise((resolve) => {
+        const proc = spawn(agyBinary, args, {
+            cwd: req.cwd || process.cwd(),
+            env: { ...process.env },
+        });
+        let buffer = '';
+        let fullResponse = '';
+        let finalResult = {
+            success: true,
+            response: '',
+        };
+        proc.stdout.on('data', async (chunk) => {
+            buffer += chunk.toString();
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed)
+                    continue;
+                try {
+                    const parsed = JSON.parse(trimmed);
+                    if (parsed.event === 'step_update' && parsed.step_update?.text_delta) {
+                        const delta = parsed.step_update.text_delta;
+                        fullResponse += delta;
+                        await onDelta(delta);
+                    }
+                    else if (parsed.event === 'result' && parsed.result) {
+                        finalResult = {
+                            success: parsed.result.status === 'SUCCESS',
+                            conversation_id: parsed.result.conversation_id,
+                            response: parsed.result.response || fullResponse,
+                            duration_seconds: parsed.result.duration_seconds,
+                            num_turns: parsed.result.num_turns,
+                            usage: parsed.result.usage,
+                        };
+                    }
                 }
-                else if (parsed.event === 'result' && parsed.result) {
-                    finalResult = {
-                        success: parsed.result.status === 'SUCCESS',
-                        conversation_id: parsed.result.conversation_id,
-                        response: parsed.result.response || fullResponse,
-                        duration_seconds: parsed.result.duration_seconds,
-                        num_turns: parsed.result.num_turns,
-                        usage: parsed.result.usage,
-                    };
+                catch {
+                    // ignore non-json
                 }
             }
-            catch {
-                // Non-JSON output line (e.g. status prints)
+        });
+        let stderr = '';
+        proc.stderr.on('data', (data) => {
+            stderr += data.toString();
+        });
+        proc.on('close', async (code) => {
+            if (code !== 0 && !fullResponse) {
+                await onError(stderr.trim() || `Process exited with code ${code}`);
             }
-        }
-    });
-    let stderr = '';
-    proc.stderr.on('data', (data) => {
-        stderr += data.toString();
-    });
-    proc.on('close', (code) => {
-        if (code !== 0 && !fullResponse) {
-            onError(stderr.trim() || `Process exited with code ${code}`);
-            return;
-        }
-        finalResult.response = finalResult.response || fullResponse;
-        onComplete(finalResult);
-    });
-    proc.on('error', (err) => {
-        onError(`Failed to spawn agy: ${err.message}`);
+            else {
+                finalResult.response = finalResult.response || fullResponse;
+                await onComplete(finalResult);
+            }
+            resolve();
+        });
+        proc.on('error', async (err) => {
+            await onError(`Failed to spawn agy: ${err.message}`);
+            resolve();
+        });
     });
 }
 export const SUPPORTED_MODELS = [

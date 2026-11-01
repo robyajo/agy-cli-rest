@@ -129,7 +129,7 @@ app.post('/v1/chat/completions', async (c) => {
     return streamSSE(c, async (stream) => {
       // Send initial role chunk
       await stream.writeSSE({
-        data: JSON.stringify(formatOpenAIChunk(reqId, model, '', null)),
+        data: JSON.stringify(formatOpenAIChunk(reqId, model, '', null, 'assistant')),
       });
 
       await executeAgyStream(

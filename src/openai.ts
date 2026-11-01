@@ -7,7 +7,7 @@ export function messagesToPrompt(messages: OpenAIMessage[]): string {
   // Format multi-turn messages
   return messages
     .map((m) => {
-      if (m.role === 'system') return `[System: ${m.content}]`;
+      if (m.role === 'system') return `[System Instructions: ${m.content}]`;
       if (m.role === 'user') return `User: ${m.content}`;
       if (m.role === 'assistant') return `Assistant: ${m.content}`;
       return `${m.role}: ${m.content}`;
@@ -44,7 +44,21 @@ export function formatOpenAIResponse(
   };
 }
 
-export function formatOpenAIChunk(id: string, model: string, deltaContent: string, finishReason: string | null = null) {
+export function formatOpenAIChunk(
+  id: string,
+  model: string,
+  deltaContent: string,
+  finishReason: string | null = null,
+  role?: string
+) {
+  const delta: Record<string, any> = {};
+  if (role) {
+    delta.role = role;
+  }
+  if (deltaContent) {
+    delta.content = deltaContent;
+  }
+
   return {
     id,
     object: 'chat.completion.chunk',
@@ -53,7 +67,7 @@ export function formatOpenAIChunk(id: string, model: string, deltaContent: strin
     choices: [
       {
         index: 0,
-        delta: deltaContent ? { content: deltaContent } : {},
+        delta,
         finish_reason: finishReason,
       },
     ],

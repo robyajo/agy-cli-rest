@@ -7,7 +7,7 @@ export function messagesToPrompt(messages) {
     return messages
         .map((m) => {
         if (m.role === 'system')
-            return `[System: ${m.content}]`;
+            return `[System Instructions: ${m.content}]`;
         if (m.role === 'user')
             return `User: ${m.content}`;
         if (m.role === 'assistant')
@@ -39,7 +39,14 @@ export function formatOpenAIResponse(id, model, content, usage) {
         },
     };
 }
-export function formatOpenAIChunk(id, model, deltaContent, finishReason = null) {
+export function formatOpenAIChunk(id, model, deltaContent, finishReason = null, role) {
+    const delta = {};
+    if (role) {
+        delta.role = role;
+    }
+    if (deltaContent) {
+        delta.content = deltaContent;
+    }
     return {
         id,
         object: 'chat.completion.chunk',
@@ -48,7 +55,7 @@ export function formatOpenAIChunk(id, model, deltaContent, finishReason = null) 
         choices: [
             {
                 index: 0,
-                delta: deltaContent ? { content: deltaContent } : {},
+                delta,
                 finish_reason: finishReason,
             },
         ],
