@@ -18,7 +18,10 @@ app.use('*', async (c, next) => {
   if (!apiKey) return next();
 
   const authHeader = c.req.header('Authorization');
-  const token = authHeader?.replace(/^Bearer\s+/i, '');
+  const token =
+    authHeader?.replace(/^Bearer\s+/i, '') ||
+    c.req.header('x-api-key') ||
+    c.req.header('api-key');
 
   if (c.req.path === '/' || c.req.path === '/health') {
     return next();

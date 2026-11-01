@@ -17,6 +17,14 @@ Turn your local Antigravity CLI into a remote API server with full support for r
 
 ---
 
+## 📚 Documentation & Integration Guides
+
+- **[🔑 API Key Setup Guide (Panduan API Key)](./docs/API_KEY_SETUP.md)**
+- **[📱 Client Integration Guide (Python, Node.js, Chatbox, NextChat)](./docs/CLIENT_INTEGRATION.md)**
+- **[📑 Docs Overview (Daftar Isi Dokumentasi)](./docs/README.md)**
+
+---
+
 ## 📦 Quick Start
 
 ### 1. Requirements
